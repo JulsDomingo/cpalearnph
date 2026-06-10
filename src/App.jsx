@@ -217,12 +217,29 @@ export default function App(){
   const insertTable=()=>{
     const rows=parseInt(prompt("Number of rows:",3)||3);
     const cols=parseInt(prompt("Number of columns:",3)||3);
-    let html="<table><tr>"+(Array(cols).fill("<th>Header</th>").join(""))+"</tr>";
-    for(let r=0;r<rows-1;r++){html+="<tr>"+(Array(cols).fill("<td>Cell</td>").join(""))+"</tr>";}
-    html+="</table>";
+    if(isNaN(rows)||isNaN(cols))return;
+    let html="<table><tr>"+(Array(cols).fill(0).map((_,i)=>`<th contenteditable='true'>Header ${i+1}</th>`).join(""))+"</tr>";
+    for(let r=0;r<rows-1;r++){html+="<tr>"+(Array(cols).fill(0).map(()=>`<td contenteditable='true'>Cell</td>`).join(""))+"</tr>";}
+    html+="</table><p><br/></p>";
     execCmd("insertHTML",html);
   };
-  const insertHR=()=>execCmd("insertHTML","<hr/><p></p>");
+  const insertHR=()=>execCmd("insertHTML","<hr/><p><br/></p>");
+
+  // Delete selected element (table, hr, or any block)
+  const deleteSelectedElement=()=>{
+    const sel=window.getSelection();
+    if(!sel||sel.rangeCount===0)return;
+    let node=sel.anchorNode;
+    // Walk up to find table or hr
+    while(node&&node!==editorRef.current){
+      if(node.nodeName==="TABLE"||node.nodeName==="HR"){
+        node.parentNode.removeChild(node);
+        return;
+      }
+      node=node.parentNode;
+    }
+    showToast("Click inside the table or on the line first, then click Delete","error");
+  };
 
   const saveNote=async()=>{
     const body=editorRef.current?.innerHTML||"";
@@ -732,6 +749,20 @@ export default function App(){
                     <div style={{width:1,background:t.border,margin:"0 3px",height:20}}/>
                     <button onMouseDown={e=>{e.preventDefault();insertTable();}} style={{...btn(false),padding:"3px 10px",fontSize:11}}>⊞ Table</button>
                     <button onMouseDown={e=>{e.preventDefault();insertHR();}} style={{...btn(false),padding:"3px 10px",fontSize:11}}>— Line</button>
+                    <label onMouseDown={e=>e.stopPropagation()} style={{...btn(false),padding:"3px 10px",fontSize:11,cursor:"pointer",display:"inline-flex",alignItems:"center"}}>
+                      🖼 Image
+                      <input type="file" accept="image/*" onChange={e=>{
+                        const file=e.target.files[0];
+                        if(!file)return;
+                        const reader=new FileReader();
+                        reader.onload=(ev)=>{
+                          execCmd("insertHTML",`<img src="${ev.target.result}" style="max-width:100%;border-radius:6px;margin:8px 0;" /><p><br/></p>`);
+                        };
+                        reader.readAsDataURL(file);
+                        e.target.value="";
+                      }} style={{display:"none"}}/>
+                    </label>
+                    <button onMouseDown={e=>{e.preventDefault();deleteSelectedElement();}} style={{...btn(false,true),padding:"3px 10px",fontSize:11}}>🗑 Delete</button>
                     <button onMouseDown={e=>{e.preventDefault();execCmd("removeFormat");}} style={{...btn(false),padding:"3px 10px",fontSize:11}}>✕ Clear</button>
                   </div>
                 )}
