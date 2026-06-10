@@ -491,6 +491,8 @@ export default function App(){
   const insertThreeColumns=()=>{
     execCmd("insertHTML",`<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin:12px 0;"><div style="border:1px solid #ddd;border-radius:6px;padding:12px;min-height:60px;" contenteditable="true">Column 1</div><div style="border:1px solid #ddd;border-radius:6px;padding:12px;min-height:60px;" contenteditable="true">Column 2</div><div style="border:1px solid #ddd;border-radius:6px;padding:12px;min-height:60px;" contenteditable="true">Column 3</div></div><p><br/></p>`);
   };
+
+  const deleteSelectedElement=()=>{
     const sel=window.getSelection();
     if(!sel||sel.rangeCount===0)return;
     let node=sel.anchorNode;
@@ -1806,3 +1808,4 @@ export default function App(){
       </div>
     </div>
   );
+}
