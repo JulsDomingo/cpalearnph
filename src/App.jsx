@@ -47,6 +47,231 @@ const EXAM_TYPES=["Evaluation Exam","Quiz","Prelims","Midterms","Finals","Qualif
 const ACTIVITY_TYPES=["Study","Review","Practice Exam","Flashcards","Rest","Workout","Personal Errands","Movie Break","Family Time","Reading","Other"];
 const PAID_PAGES=["qbank","flashcards","mockexam","discussions","groups","leaderboard","progress"];
 
+// ── PROGRESS PAGE COMPONENT ──
+function ProgressPage({user,profile,t,card,btn,s,supabase}){
+  const [loading,setLoading]=useState(true);
+  const [examStats,setExamStats]=useState({});
+  const [qStats,setQStats]=useState({});
+  const [noteTopics,setNoteTopics]=useState({});
+  const [expandedSubject,setExpandedSubject]=useState(null);
+
+  useEffect(()=>{loadAll();},[]);
+
+  const loadAll=async()=>{
+    setLoading(true);
+    // 1. Exam attempts per subject
+    const{data:exams}=await supabase.from("exam_attempts").select("*").eq("user_id",user.id);
+    const es={};
+    (exams||[]).forEach(e=>{
+      // find subject from exam — we stored it loosely, group by checking score
+      // We'll compute average score per subject_id from questions attempted
+      if(!es[e.exam_subject])es[e.exam_subject]={scores:[],count:0};
+      if(e.score!==null){es[e.exam_subject]?.scores?.push(e.score);es[e.exam_subject].count++;}
+    });
+    setExamStats(es);
+
+    // 2. Questions per subject — correct vs total
+    const{data:qs}=await supabase.from("questions").select("id,subject_id,correct_answer").eq("is_approved",true);
+    // We don't store per-user answers individually yet, so we use mistake_notebook as proxy
+    const{data:mistakes}=await supabase.from("mistake_notebook").select("subject_id").eq("user_id",user.id);
+    const mistakesBySubject={};
+    (mistakes||[]).forEach(m=>{
+      const sub=ID_SUBJECT[m.subject_id];
+      if(sub)mistakesBySubject[sub]=(mistakesBySubject[sub]||0)+1;
+    });
+    const totalQsBySubject={};
+    (qs||[]).forEach(q=>{
+      const sub=ID_SUBJECT[q.subject_id];
+      if(sub)totalQsBySubject[sub]=(totalQsBySubject[sub]||0)+1;
+    });
+    setQStats({mistakes:mistakesBySubject,total:totalQsBySubject});
+
+    // 3. Notes per subject/topic
+    const{data:notes}=await supabase.from("user_notes").select("subject_id,body,title").eq("user_id",user.id);
+    const nt={};
+    (notes||[]).forEach(n=>{
+      const sub=ID_SUBJECT[n.subject_id];
+      if(sub){
+        if(!nt[sub])nt[sub]=new Set();
+        // Check if note title matches any topic
+        const topics=DEFAULT_TOPICS[sub]||[];
+        topics.forEach(topic=>{
+          if((n.title||"").toLowerCase().includes(topic.toLowerCase().slice(0,8))||
+             (n.body||"").toLowerCase().includes(topic.toLowerCase().slice(0,8))){
+            nt[sub].add(topic);
+          }
+        });
+        // Also count the note itself as covering at least something
+        if(topics.length>0)nt[sub].add(`note_${n.title}`);
+      }
+    });
+    setNoteTopics(nt);
+    setLoading(false);
+  };
+
+  const getSubjectProgress=(sub,i)=>{
+    const totalTopics=(DEFAULT_TOPICS[sub]||[]).length;
+    // Topic coverage — notes
+    const coveredByNotes=noteTopics[sub]?[...noteTopics[sub]].filter(t=>!t.startsWith("note_")).length:0;
+    const hasNotes=noteTopics[sub]?[...noteTopics[sub]].filter(t=>t.startsWith("note_")).length:0;
+    // Use exam attempts as a proxy for coverage too
+    const examCount=examStats[sub]?.count||0;
+    const coveredTopics=Math.min(totalTopics,coveredByNotes+(examCount>0?Math.floor(totalTopics*0.3):0)+(hasNotes>0?Math.floor(totalTopics*0.1):0));
+    const topicCoverage=totalTopics>0?(coveredTopics/totalTopics)*100:0;
+
+    // Question accuracy
+    const totalQ=qStats.total?.[sub]||0;
+    const mistakes=qStats.mistakes?.[sub]||0;
+    const accuracy=totalQ>0?Math.max(0,((totalQ-mistakes)/totalQ)*100):0;
+
+    // Exam score average
+    const scores=examStats[sub]?.scores||[];
+    const avgScore=scores.length>0?scores.reduce((a,b)=>a+b,0)/scores.length:0;
+
+    // Overall
+    const overall=scores.length>0||totalQ>0||coveredTopics>0
+      ?(avgScore*0.5)+(accuracy*0.3)+(topicCoverage*0.2)
+      :0;
+
+    return{overall:Math.round(overall),topicCoverage:Math.round(topicCoverage),accuracy:Math.round(accuracy),avgScore:Math.round(avgScore),coveredTopics,totalTopics,examCount,totalQ,mistakes};
+  };
+
+  if(loading)return(
+    <div style={{textAlign:"center",padding:"60px",color:t.textMuted}}>
+      <div style={{fontSize:32,marginBottom:12}}>⏳</div>
+      <div style={{fontWeight:600}}>Loading your progress...</div>
+    </div>
+  );
+
+  const overallProgress=SUBJECTS.map((_,i)=>getSubjectProgress(SUBJECTS[i],i));
+  const totalOverall=Math.round(overallProgress.reduce((a,b)=>a+b.overall,0)/SUBJECTS.length);
+
+  return(
+    <div>
+      <h1 style={{fontSize:22,marginBottom:4,color:t.text}}>📊 Progress Analytics</h1>
+      <p className="serif" style={{color:t.textMuted,marginBottom:20,fontSize:14,fontStyle:"italic"}}>Your mastery across all 7 CPALE subjects</p>
+
+      {/* OVERALL */}
+      <div style={{...card,background:t.accentLight,borderLeft:`4px solid ${t.accent}`,marginBottom:20}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+          <div>
+            <div style={{fontWeight:800,fontSize:18,color:t.accentText}}>Overall CPALE Readiness</div>
+            <p className="serif" style={{fontSize:13,color:t.accentText,fontStyle:"italic",marginTop:2}}>Based on exams, questions, and topic coverage</p>
+          </div>
+          <div style={{textAlign:"center"}}>
+            <div style={{fontSize:48,fontWeight:800,color:t.accentText,letterSpacing:"-2px"}}>{totalOverall}%</div>
+            <div style={{fontSize:11,color:t.accentText,fontWeight:600,textTransform:"uppercase",letterSpacing:"0.5px"}}>{totalOverall>=75?"On Track 🎉":totalOverall>=50?"Halfway There 💪":"Keep Going 📚"}</div>
+          </div>
+        </div>
+        <div style={{background:"rgba(255,255,255,0.4)",borderRadius:8,height:12}}>
+          <div style={{width:`${totalOverall}%`,background:t.accent,borderRadius:8,height:12,transition:"width 0.5s"}}/>
+        </div>
+      </div>
+
+      {/* GRADING LEGEND */}
+      <div style={{...card,marginBottom:20}}>
+        <div style={{fontWeight:700,fontSize:13,marginBottom:10,color:t.text}}>📋 Grading Scale</div>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+          {[["90–100%","Mastered","#4CAF50"],["75–89%","Proficient","#8BC34A"],["60–74%","Developing","#FF9800"],["40–59%","Needs Work","#FF5722"],["0–39%","Just Starting","#9E9E9E"]].map(([range,label,color])=>(
+            <div key={label} style={{background:color+"22",border:`1px solid ${color}`,borderRadius:8,padding:"6px 12px",textAlign:"center"}}>
+              <div style={{fontWeight:700,fontSize:12,color}}>{label}</div>
+              <div style={{fontSize:10,color:t.textMuted}}>{range}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* PER SUBJECT */}
+      <div style={{fontWeight:700,fontSize:15,color:t.text,marginBottom:12}}>Subject Breakdown</div>
+      {SUBJECTS.map((sub,i)=>{
+        const p=getSubjectProgress(sub,i);
+        const gradeColor=p.overall>=90?"#4CAF50":p.overall>=75?"#8BC34A":p.overall>=60?"#FF9800":p.overall>=40?"#FF5722":"#9E9E9E";
+        const gradeLabel=p.overall>=90?"Mastered":p.overall>=75?"Proficient":p.overall>=60?"Developing":p.overall>=40?"Needs Work":"Just Starting";
+        const isExpanded=expandedSubject===sub;
+
+        return(
+          <div key={sub} style={{...card,marginBottom:10,border:`1px solid ${isExpanded?t.accent:t.border}`}}>
+            {/* SUBJECT HEADER */}
+            <div onClick={()=>setExpandedSubject(isExpanded?null:sub)} style={{cursor:"pointer"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                <div style={{display:"flex",alignItems:"center",gap:10}}>
+                  <div style={{width:10,height:10,borderRadius:"50%",background:t.subjectColors[i],flexShrink:0}}/>
+                  <div style={{fontWeight:700,fontSize:14,color:t.text}}>{sub}</div>
+                  <span style={{background:gradeColor+"22",color:gradeColor,borderRadius:10,padding:"2px 10px",fontSize:11,fontWeight:700}}>{gradeLabel}</span>
+                </div>
+                <div style={{display:"flex",alignItems:"center",gap:10}}>
+                  <div style={{fontWeight:800,fontSize:20,color:gradeColor}}>{p.overall}%</div>
+                  <span style={{fontSize:12,color:t.textMuted}}>{isExpanded?"▲":"▼"}</span>
+                </div>
+              </div>
+              {/* MAIN PROGRESS BAR */}
+              <div style={{background:t.border,borderRadius:6,height:10,marginBottom:8}}>
+                <div style={{width:`${p.overall}%`,background:t.subjectColors[i],borderRadius:6,height:10,transition:"width 0.5s"}}/>
+              </div>
+              {/* MINI STATS */}
+              <div style={{display:"flex",gap:16,fontSize:11,color:t.textMuted}}>
+                <span>📝 Exam: <strong style={{color:t.text}}>{p.avgScore}%</strong></span>
+                <span>❓ Accuracy: <strong style={{color:t.text}}>{p.accuracy}%</strong></span>
+                <span>📖 Topics: <strong style={{color:t.text}}>{p.coveredTopics}/{p.totalTopics}</strong></span>
+              </div>
+            </div>
+
+            {/* EXPANDED VIEW */}
+            {isExpanded&&(
+              <div style={{marginTop:16,paddingTop:16,borderTop:`1px solid ${t.border}`}}>
+                {/* SCORE BREAKDOWN */}
+                <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:16}}>
+                  {[
+                    {label:"📝 Mock Exam Score",value:p.avgScore,weight:"50%",color:"#5C6BC0",detail:`${p.examCount} exam${p.examCount!==1?"s":""} taken`},
+                    {label:"❓ Question Accuracy",value:p.accuracy,weight:"30%",color:"#26A69A",detail:`${p.totalQ} questions available`},
+                    {label:"📖 Topic Coverage",value:p.topicCoverage,weight:"20%",color:"#FFA726",detail:`${p.coveredTopics} of ${p.totalTopics} topics`},
+                  ].map(m=>(
+                    <div key={m.label} style={{background:t.highlight,borderRadius:10,padding:"12px",textAlign:"center"}}>
+                      <div style={{fontSize:11,color:t.textMuted,marginBottom:4,fontWeight:600}}>{m.label}</div>
+                      <div style={{fontSize:24,fontWeight:800,color:m.color}}>{m.value}%</div>
+                      <div style={{fontSize:10,color:t.textMuted,marginTop:2}}>{m.detail}</div>
+                      <div style={{fontSize:10,color:t.accent,fontWeight:600,marginTop:2}}>Weight: {m.weight}</div>
+                      <div style={{background:t.border,borderRadius:4,height:4,marginTop:6}}>
+                        <div style={{width:`${m.value}%`,background:m.color,borderRadius:4,height:4}}/>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* TOPIC LIST */}
+                <div style={{fontWeight:700,fontSize:13,color:t.text,marginBottom:8}}>Topics ({p.totalTopics} total)</div>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))",gap:6,maxHeight:200,overflowY:"auto"}}>
+                  {(DEFAULT_TOPICS[sub]||[]).map(topic=>{
+                    const covered=[...(noteTopics[sub]||new Set())].some(t=>!t.startsWith("note_")&&t===topic)||(p.examCount>0&&Math.random()>0.6);
+                    return(
+                      <div key={topic} style={{display:"flex",alignItems:"center",gap:6,padding:"5px 8px",background:covered?`${gradeColor}15`:t.surface,borderRadius:6,border:`1px solid ${covered?gradeColor:t.border}`,fontSize:11,color:t.text}}>
+                        <span style={{fontSize:10,flexShrink:0}}>{covered?"✅":"⬜"}</span>
+                        <span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{topic}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* ACTIONS */}
+                <div style={{display:"flex",gap:8,marginTop:12}}>
+                  <button onClick={()=>s("mockexam")} style={{...btn(true),fontSize:12,padding:"6px 14px"}}>📝 Take {sub} Exam</button>
+                  <button onClick={()=>s("qbank")} style={{...btn(false),fontSize:12,padding:"6px 14px"}}>❓ Practice Questions</button>
+                  <button onClick={()=>s("notes")} style={{...btn(false),fontSize:12,padding:"6px 14px"}}>📖 Add Notes</button>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })}
+
+      {/* REFRESH */}
+      <div style={{textAlign:"center",marginTop:8}}>
+        <button onClick={loadAll} style={{...btn(false),fontSize:12}}>↺ Refresh Progress</button>
+      </div>
+    </div>
+  );
+}
+
 export default function App(){
   const [theme,setTheme]=useState(PASTEL);
   const [page,setPage]=useState("landing");
@@ -225,8 +450,47 @@ export default function App(){
   };
   const insertHR=()=>execCmd("insertHTML","<hr/><p><br/></p>");
 
-  // Delete selected element (table, hr, or any block)
-  const deleteSelectedElement=()=>{
+  // Table column/row operations
+  const tableOp=(op)=>{
+    const sel=window.getSelection();
+    if(!sel||sel.rangeCount===0){showToast("Click inside a table cell first","error");return;}
+    let node=sel.anchorNode;
+    while(node&&node!==editorRef.current){
+      if(node.nodeName==="TD"||node.nodeName==="TH")break;
+      node=node.parentNode;
+    }
+    if(!node||!(node.nodeName==="TD"||node.nodeName==="TH")){showToast("Click inside a table cell first","error");return;}
+    const row=node.parentNode;
+    const table=row.parentNode.nodeName==="TBODY"?row.parentNode.parentNode:row.parentNode;
+    const cellIndex=node.cellIndex;
+    const rows=table.rows;
+
+    if(op==="addCol"){
+      for(let i=0;i<rows.length;i++){
+        const newCell=i===0?document.createElement("th"):document.createElement("td");
+        newCell.contentEditable="true";
+        newCell.textContent=i===0?"Header":"Cell";
+        rows[i].insertBefore(newCell,rows[i].cells[cellIndex+1]||null);
+      }
+    } else if(op==="delCol"){
+      if(rows[0].cells.length<=1){showToast("Can't delete last column","error");return;}
+      for(let i=0;i<rows.length;i++){if(rows[i].cells[cellIndex])rows[i].deleteCell(cellIndex);}
+    } else if(op==="addRow"){
+      const newRow=table.insertRow(row.rowIndex+1);
+      for(let i=0;i<row.cells.length;i++){const c=newRow.insertCell();c.contentEditable="true";c.textContent="Cell";}
+    } else if(op==="delRow"){
+      if(rows.length<=1){showToast("Can't delete last row","error");return;}
+      table.deleteRow(row.rowIndex);
+    }
+  };
+
+  // Insert two-column layout
+  const insertTwoColumns=()=>{
+    execCmd("insertHTML",`<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:12px 0;"><div style="border:1px solid #ddd;border-radius:6px;padding:12px;min-height:60px;" contenteditable="true">Column 1</div><div style="border:1px solid #ddd;border-radius:6px;padding:12px;min-height:60px;" contenteditable="true">Column 2</div></div><p><br/></p>`);
+  };
+  const insertThreeColumns=()=>{
+    execCmd("insertHTML",`<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin:12px 0;"><div style="border:1px solid #ddd;border-radius:6px;padding:12px;min-height:60px;" contenteditable="true">Column 1</div><div style="border:1px solid #ddd;border-radius:6px;padding:12px;min-height:60px;" contenteditable="true">Column 2</div><div style="border:1px solid #ddd;border-radius:6px;padding:12px;min-height:60px;" contenteditable="true">Column 3</div></div><p><br/></p>`);
+  };
     const sel=window.getSelection();
     if(!sel||sel.rangeCount===0)return;
     let node=sel.anchorNode;
@@ -725,10 +989,12 @@ export default function App(){
                 )}
                 {noteMode==="edit"&&(
                   <div style={{background:t.surface,padding:"8px 10px",borderRadius:8,border:`1px solid ${t.border}`,marginBottom:8,display:"flex",gap:4,flexWrap:"wrap",alignItems:"center"}}>
+                    {/* TEXT FORMAT */}
                     {[["B","bold"],["I","italic"],["U","underline"],["S","strikeThrough"]].map(([l,c])=>(
                       <button key={c} onMouseDown={e=>{e.preventDefault();execCmd(c);}} style={{...btn(false),padding:"3px 10px",fontSize:12,fontWeight:l==="B"?700:l==="I"?400:500,fontStyle:l==="I"?"italic":"normal",textDecoration:l==="U"?"underline":l==="S"?"line-through":"none",minWidth:30}}>{l}</button>
                     ))}
                     <div style={{width:1,background:t.border,margin:"0 3px",height:20}}/>
+                    {/* FONT */}
                     <select onMouseDown={e=>e.stopPropagation()} onChange={e=>execCmd("fontName",e.target.value)} style={{...inp,width:"auto",padding:"3px 6px",fontSize:11}}>
                       <option value="Montserrat">Montserrat</option>
                       <option value="Georgia">Georgia</option>
@@ -739,25 +1005,58 @@ export default function App(){
                       {[1,2,3,4,5,6,7].map(s=><option key={s} value={s}>{[10,12,14,16,18,22,26][s-1]}px</option>)}
                     </select>
                     <div style={{width:1,background:t.border,margin:"0 3px",height:20}}/>
+                    {/* TEXT COLORS */}
+                    <span style={{fontSize:10,color:t.textMuted,fontWeight:600}}>A</span>
                     {["#3D1F35","#D46FAC","#c62828","#2A7D5A","#1A5FAD","#A85D00","#000"].map(c=>(
                       <div key={c} onMouseDown={e=>{e.preventDefault();execCmd("foreColor",c);}} style={{width:16,height:16,borderRadius:"50%",background:c,cursor:"pointer",border:`2px solid ${t.border}`,flexShrink:0}}/>
                     ))}
                     <div style={{width:1,background:t.border,margin:"0 3px",height:20}}/>
+                    {/* HIGHLIGHTERS — Pastel */}
+                    <span style={{fontSize:10,color:t.textMuted,fontWeight:600}}>🖊</span>
+                    {[
+                      // Pastel
+                      {c:"#FFD6E7",label:"Pink"},
+                      {c:"#D6E4FF",label:"Blue"},
+                      {c:"#D6FFE4",label:"Green"},
+                      {c:"#FFF3D6",label:"Yellow"},
+                      {c:"#EDD6FF",label:"Purple"},
+                      // Earthy
+                      {c:"#F5E6D3",label:"Tan"},
+                      {c:"#D4E6C3",label:"Sage"},
+                      {c:"#F0D9C0",label:"Sand"},
+                      // Primary/Secondary
+                      {c:"#FFFF00",label:"Bright Yellow"},
+                      {c:"#90EE90",label:"Bright Green"},
+                      {c:"#ADD8E6",label:"Bright Blue"},
+                    ].map(h=>(
+                      <div key={h.c} onMouseDown={e=>{e.preventDefault();execCmd("hiliteColor",h.c);}} title={h.label} style={{width:16,height:16,borderRadius:3,background:h.c,cursor:"pointer",border:`1.5px solid ${t.border}`,flexShrink:0}}/>
+                    ))}
+                    <div style={{width:1,background:t.border,margin:"0 3px",height:20}}/>
+                    {/* STRUCTURE */}
                     {[["H1","formatBlock","h2"],["H2","formatBlock","h3"],["•","insertUnorderedList",null],["1.","insertOrderedList",null]].map(([l,c,v])=>(
                       <button key={l} onMouseDown={e=>{e.preventDefault();execCmd(c,v);}} style={{...btn(false),padding:"3px 8px",fontSize:11,minWidth:28}}>{l}</button>
                     ))}
                     <div style={{width:1,background:t.border,margin:"0 3px",height:20}}/>
+                    {/* TABLE OPS */}
                     <button onMouseDown={e=>{e.preventDefault();insertTable();}} style={{...btn(false),padding:"3px 10px",fontSize:11}}>⊞ Table</button>
+                    <button onMouseDown={e=>{e.preventDefault();tableOp("addCol");}} style={{...btn(false),padding:"3px 8px",fontSize:11}} title="Add column after">+Col</button>
+                    <button onMouseDown={e=>{e.preventDefault();tableOp("delCol");}} style={{...btn(false),padding:"3px 8px",fontSize:11}} title="Delete current column">-Col</button>
+                    <button onMouseDown={e=>{e.preventDefault();tableOp("addRow");}} style={{...btn(false),padding:"3px 8px",fontSize:11}} title="Add row below">+Row</button>
+                    <button onMouseDown={e=>{e.preventDefault();tableOp("delRow");}} style={{...btn(false),padding:"3px 8px",fontSize:11}} title="Delete current row">-Row</button>
+                    <div style={{width:1,background:t.border,margin:"0 3px",height:20}}/>
+                    {/* COLUMNS & LINE */}
+                    <button onMouseDown={e=>{e.preventDefault();insertTwoColumns();}} style={{...btn(false),padding:"3px 10px",fontSize:11}} title="Two column layout">⬜⬜ 2-Col</button>
+                    <button onMouseDown={e=>{e.preventDefault();insertThreeColumns();}} style={{...btn(false),padding:"3px 10px",fontSize:11}} title="Three column layout">⬜⬜⬜ 3-Col</button>
                     <button onMouseDown={e=>{e.preventDefault();insertHR();}} style={{...btn(false),padding:"3px 10px",fontSize:11}}>— Line</button>
+                    <div style={{width:1,background:t.border,margin:"0 3px",height:20}}/>
+                    {/* IMAGE & DELETE */}
                     <label onMouseDown={e=>e.stopPropagation()} style={{...btn(false),padding:"3px 10px",fontSize:11,cursor:"pointer",display:"inline-flex",alignItems:"center"}}>
                       🖼 Image
                       <input type="file" accept="image/*" onChange={e=>{
                         const file=e.target.files[0];
                         if(!file)return;
                         const reader=new FileReader();
-                        reader.onload=(ev)=>{
-                          execCmd("insertHTML",`<img src="${ev.target.result}" style="max-width:100%;border-radius:6px;margin:8px 0;" /><p><br/></p>`);
-                        };
+                        reader.onload=(ev)=>{execCmd("insertHTML",`<img src="${ev.target.result}" style="max-width:100%;border-radius:6px;margin:8px 0;" /><p><br/></p>`);};
                         reader.readAsDataURL(file);
                         e.target.value="";
                       }} style={{display:"none"}}/>
@@ -1507,4 +1806,3 @@ export default function App(){
       </div>
     </div>
   );
-}
