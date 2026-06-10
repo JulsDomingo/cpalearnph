@@ -592,7 +592,7 @@ export default function App(){
         {/* SUBJECTS */}
         {page==="subjects"&&(
           <div>
-            <h1 style={{fontSize:22,marginBottom:4}}>📚 Subject Library</h1>
+            <h1 style={{fontSize:22,marginBottom:4,color:t.text}}>📚 Subject Library</h1>
             <p className="serif" style={{color:t.textMuted,marginBottom:16,fontSize:14,fontStyle:"italic"}}>{isPaid?"Browse, upload & download public materials":"Upload your own private materials"}</p>
             <div style={{display:"flex",gap:8,marginBottom:16,flexWrap:"wrap"}}>
               {SUBJECTS.map((s2,i)=>(
@@ -657,7 +657,7 @@ export default function App(){
             {noteMode==="list"&&(
               <>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:16}}>
-                  <div><h1 style={{fontSize:22,marginBottom:4}}>📖 Notes Vault</h1><p className="serif" style={{color:t.textMuted,fontSize:14,fontStyle:"italic"}}>Rich text notes with tables, formatting, and print</p></div>
+                  <div>            <h1 style={{fontSize:22,marginBottom:4,color:t.text}}>📖 Notes Vault</h1><p className="serif" style={{color:t.textMuted,fontSize:14,fontStyle:"italic"}}>Rich text notes with tables, formatting, and print</p></div>
                   <button onClick={()=>{setActiveNote(null);setNoteForm({title:"",subject:"FAR",topic:"",body:"",is_shared:false});setNoteMode("edit");}} style={btn(true)}>+ New Note</button>
                 </div>
                 {notes.length===0?(
@@ -1413,7 +1413,7 @@ export default function App(){
                 <div key={p.id} style={{...card,borderLeft:`3px solid ${t.accent}`,marginBottom:10}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
                     <div>
-                      <div style={{fontWeight:700,fontSize:14,color:t.text}}>User ID: {p.user_id?.slice(0,16)}...</div>
+            <div style={{fontWeight:700,fontSize:15,color:t.text}}>User ID: {p.user_id}</div>
                       <div style={{fontSize:11,color:t.textMuted,marginTop:2}}>Submitted: {fmtDate(p.created_at)}</div>
                     </div>
                     <span style={{background:t.badge,color:t.badgeText,borderRadius:10,padding:"4px 12px",fontSize:13,fontWeight:700}}>₱{p.amount}</span>
