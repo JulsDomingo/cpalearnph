@@ -733,7 +733,7 @@ export default function App(){
                   </div>
                 )}
                 <div className="print-zone" style={{background:"white",borderRadius:10,border:`1px solid ${t.border}`,overflow:"hidden"}}>
-                  <div style={{padding:"12px 16px",background:t.highlight,borderBottom:`1px solid ${t.border}`,fontSize:12,color:t.textMuted,display:"flex",gap:16"}}>
+                  <div style={{padding:"12px 16px",background:t.highlight,borderBottom:`1px solid ${t.border}`,fontSize:12,color:t.textMuted,display:"flex",gap:16}}>
                     <span><strong>CPALearn PH</strong> · {noteForm.subject}</span>
                     {noteForm.topic&&<span>· {noteForm.topic}</span>}
                     <span style={{marginLeft:"auto"}}>Generated: {new Date().toLocaleDateString("en-PH",{month:"short",day:"numeric",year:"numeric"})}</span>
