@@ -12,11 +12,12 @@ const MARIBANK_QR = "https://gxijcltazyshbmsfjbdf.supabase.co/storage/v1/object/
 const FONT_STYLE = `
 @import url('https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=Sorts+Mill+Goudy:ital@0;1&display=swap');
 *{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:'Montserrat',sans-serif;}
-h1,h2,h3{font-family:'Montserrat',sans-serif;font-weight:800;letter-spacing:-0.5px;}
-.serif{font-family:'Sorts Mill Goudy',serif;}
-input,textarea,select,button{font-family:'Montserrat',sans-serif;}
-.note-editor{outline:none;min-height:300px;padding:16px;font-size:14px;line-height:1.9;word-break:break-word;}
+body{font-family:'Montserrat','Segoe UI',Arial,sans-serif;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;}
+h1,h2,h3{font-family:'Montserrat','Segoe UI',Arial,sans-serif;font-weight:800;letter-spacing:-0.5px;}
+.serif{font-family:'Sorts Mill Goudy',Georgia,serif;}
+input,textarea,select,button{font-family:'Montserrat','Segoe UI',Arial,sans-serif;}
+p,span,div,label{font-family:'Montserrat','Segoe UI',Arial,sans-serif;}
+.note-editor{outline:none;min-height:300px;padding:16px;font-size:14px;line-height:1.9;word-break:break-word;font-family:'Montserrat','Segoe UI',Arial,sans-serif;}
 .note-editor table{border-collapse:collapse;width:100%;margin:12px 0;}
 .note-editor table td,.note-editor table th{border:1px solid #ccc;padding:8px 10px;min-width:60px;}
 .note-editor table th{background:#f5f5f5;font-weight:700;}
@@ -507,7 +508,9 @@ export default function App(){
             </div>
             <div style={{background:t.surface,borderRadius:12,padding:"18px",textAlign:"center",marginBottom:18,border:`1px solid ${t.border}`}}>
               <div style={{fontWeight:700,color:t.text,marginBottom:12,fontSize:14}}>📱 Scan to Pay — MariBank InstaPay</div>
-              <img src={MARIBANK_QR} alt="MariBank QR" style={{width:190,height:190,borderRadius:10,margin:"0 auto",display:"block",objectFit:"contain"}}/>
+              <div style={{width:190,height:190,borderRadius:10,margin:"0 auto",overflow:"hidden",position:"relative"}}>
+                <img src={MARIBANK_QR} alt="MariBank QR" style={{width:"100%",position:"absolute",top:0,left:0,objectFit:"cover",objectPosition:"top"}}/>
+              </div>
               <p style={{fontSize:12,color:t.textMuted,marginTop:10,lineHeight:1.6}}>Open any banking app → Scan QR → Send <strong>₱99</strong><br/>InstaPay transfers are <strong>FREE</strong> from any bank</p>
             </div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginBottom:18}}>
@@ -532,8 +535,8 @@ export default function App(){
 
       {/* SIDEBAR */}
       <div style={{width:210,background:t.sidebar,borderRight:`1px solid ${t.sidebarBorder}`,display:"flex",flexDirection:"column",padding:"16px 0",position:"fixed",top:0,bottom:0,left:0,zIndex:50,overflowY:"auto"}}>
-        <div style={{padding:"8px 16px 14px",borderBottom:`1px solid ${t.sidebarBorder}`,marginBottom:8,textAlign:"center"}}>
-          <img src={LOGO_URL} style={{height:32}} alt="CPALearn PH"/>
+        <div style={{padding:"12px 16px 16px",borderBottom:`1px solid ${t.sidebarBorder}`,marginBottom:8,textAlign:"center",background:t.card}}>
+          <img src={LOGO_URL} style={{height:52,width:"auto",maxWidth:"100%"}} alt="CPALearn PH"/>
         </div>
         {navItems.map(n=>(
           <button key={n.id} onClick={()=>s(n.id)} style={{display:"flex",alignItems:"center",gap:9,padding:"9px 16px",background:page===n.id?t.navActive:"transparent",color:page===n.id?t.navActiveText:t.textMuted,border:"none",cursor:"pointer",textAlign:"left",fontSize:12,fontWeight:page===n.id?700:500,borderLeft:page===n.id?`3px solid ${t.accent}`:"3px solid transparent"}}>
@@ -566,7 +569,7 @@ export default function App(){
         {/* DASHBOARD */}
         {page==="dashboard"&&(
           <div>
-            <h1 style={{fontSize:24,marginBottom:4}}>Good day, {profile?.full_name?.split(" ")[0]||"Reviewee"}! 👋</h1>
+            <h1 style={{fontSize:24,marginBottom:4,color:t.text}}>Good day, {profile?.full_name?.split(" ")[0]||"Reviewee"}! 👋</h1>
             <p className="serif" style={{color:t.textMuted,marginBottom:20,fontSize:15,fontStyle:"italic"}}>Ready to ace the board exam?</p>
             {!isPaid&&!isAdmin&&(
               <div style={{...card,borderLeft:`3px solid ${t.accent}`,background:t.accentLight,marginBottom:20,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
