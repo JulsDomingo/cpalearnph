@@ -276,8 +276,8 @@ export default function App() {
     while(node&&node!==editorRef.current){if(node.nodeName==="TABLE"||node.nodeName==="HR"){node.parentNode.removeChild(node);return;}node=node.parentNode;}
     showToast("Click inside table or on line first","error");
   };
-  const insert2Col=()=>execCmd("insertHTML",`<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:12px 0;"><div style="border:1px solid #ddd;border-radius:6px;padding:12px;min-height:60px;" contenteditable="true">Column 1</div><div style="border:1px solid #ddd;border-radius:6px;padding:12px;min-height:60px;" contenteditable="true">Column 2</div></div><p><br/></p>`);
-  const insert3Col=()=>execCmd("insertHTML",`<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin:12px 0;"><div style="border:1px solid #ddd;border-radius:6px;padding:12px;min-height:60px;" contenteditable="true">Column 1</div><div style="border:1px solid #ddd;border-radius:6px;padding:12px;min-height:60px;" contenteditable="true">Column 2</div><div style="border:1px solid #ddd;border-radius:6px;padding:12px;min-height:60px;" contenteditable="true">Column 3</div></div><p><br/></p>`);
+  const insert2Col=()=>execCmd("insertHTML",`<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:12px 0;"><div style="padding:12px;min-height:60px;" contenteditable="true">Column 1</div><div style="padding:12px;min-height:60px;" contenteditable="true">Column 2</div></div><p><br/></p>`);
+  const insert3Col=()=>execCmd("insertHTML",`<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin:12px 0;"><div style="padding:12px;min-height:60px;" contenteditable="true">Column 1</div><div style="padding:12px;min-height:60px;" contenteditable="true">Column 2</div><div style="padding:12px;min-height:60px;" contenteditable="true">Column 3</div></div><p><br/></p>`);
 
   const saveNote=async()=>{
     const body=editorRef.current?.innerHTML||"";
@@ -441,6 +441,10 @@ export default function App() {
       <div style={{width:1,background:t.border,margin:"0 3px",height:20}}/>
       {[["H1","formatBlock","h2"],["H2","formatBlock","h3"],["•","insertUnorderedList",null],["1.","insertOrderedList",null]].map(([l,c,v])=>(
         <button key={l} onMouseDown={e=>{e.preventDefault();execCmd(c,v);}} style={{...btn(false),padding:"3px 8px",fontSize:11,minWidth:28}}>{l}</button>
+      ))}
+      <div style={{width:1,background:t.border,margin:"0 3px",height:20}}/>
+      {[["⬅","justifyLeft"],["⬛","justifyCenter"],["➡","justifyRight"],["☰","justifyFull"]].map(([l,c])=>(
+        <button key={c} onMouseDown={e=>{e.preventDefault();execCmd(c);}} title={c.replace("justify","")} style={{...btn(false),padding:"3px 8px",fontSize:11,minWidth:28}}>{l}</button>
       ))}
       <div style={{width:1,background:t.border,margin:"0 3px",height:20}}/>
       <button onMouseDown={e=>{e.preventDefault();insertTable();}} style={{...btn(false),padding:"3px 8px",fontSize:11}}>⊞Tbl</button>
