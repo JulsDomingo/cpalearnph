@@ -121,6 +121,8 @@ export default function App() {
   const [noteForm,setNoteForm]=useState({title:"",subject:"FAR",topic:"",body:"",is_shared:false});
   const [showAddVideo,setShowAddVideo]=useState(false);
   const [newVideo,setNewVideo]=useState({title:"",url:"",subject:"FAR",topic:"",description:""});
+  const [noteUnsaved,setNoteUnsaved]=useState(false);
+  const autoSaveTimer=useRef(null);
   const editorRef=useRef(null);
   // mistakes
   const [mistakes,setMistakes]=useState([]);
@@ -148,6 +150,11 @@ export default function App() {
 
   const go=(p)=>{
     if(PAID_PAGES.includes(p)&&!isPaid){showToast("Upgrade to full access to use this feature.","error");setPage("payment");setPayStep(1);return;}
+    // Auto-save note draft before leaving
+    if(noteMode==="edit"&&editorRef.current){
+      const body=editorRef.current.innerHTML||"";
+      localStorage.setItem("cpalearnph_note_draft",JSON.stringify({...noteForm,body,noteId:activeNote?.id||null}));
+    }
     setPage(p);
   };
 
@@ -288,6 +295,8 @@ export default function App() {
       const{data}=await supabase.from("user_notes").insert({user_id:user.id,subject_id:SUBJECT_ID[noteForm.subject]||null,title:noteForm.title,body,is_shared:noteForm.is_shared&&isPaid}).select().single();
       setActiveNote(data);
     }
+    // Clear draft on save
+    localStorage.removeItem("cpalearnph_note_draft");
     showToast("Saved! ✅");fetchNotes();
   };
 
@@ -697,7 +706,22 @@ export default function App() {
                   {[["written","✏️ Written"],["files","📁 Files"],["videos","🎥 Videos"]].map(([tab,label])=>(
                     <button key={tab} onClick={()=>setNoteTab(tab)} style={{...btn(noteTab===tab),fontSize:12,padding:"7px 16px"}}>{label}</button>
                   ))}
-                  {noteTab==="written"&&<button onClick={()=>{setActiveNote(null);setNoteForm({title:"",subject:"FAR",topic:"",body:"",is_shared:false});setNoteMode("edit");}} style={{...btn(false),marginLeft:"auto",fontSize:12}}>+ New Note</button>}
+                  {noteTab==="written"&&<button onClick={()=>{
+                    setActiveNote(null);
+                    // Check for unsaved draft
+                    const draft=localStorage.getItem("cpalearnph_note_draft");
+                    if(draft){
+                      const d=JSON.parse(draft);
+                      if(!d.noteId&&window.confirm("You have an unsaved draft. Restore it?")){
+                        setNoteForm({title:d.title||"",subject:d.subject||"FAR",topic:d.topic||"",body:d.body||"",is_shared:d.is_shared||false});
+                        setNoteMode("edit");
+                        setTimeout(()=>{if(editorRef.current)editorRef.current.innerHTML=d.body||"";},100);
+                        return;
+                      }
+                    }
+                    setNoteForm({title:"",subject:"FAR",topic:"",body:"",is_shared:false});
+                    setNoteMode("edit");
+                  }} style={{...btn(false),marginLeft:"auto",fontSize:12}}>+ New Note</button>}
                   {noteTab==="files"&&(
                     <label style={{...btn(false),marginLeft:"auto",fontSize:12,cursor:"pointer",display:"inline-flex",alignItems:"center",gap:6}}>
                       + Upload File
@@ -863,7 +887,10 @@ export default function App() {
                     <span style={{marginLeft:"auto"}}>{new Date().toLocaleDateString("en-PH",{month:"short",day:"numeric",year:"numeric"})}</span>
                   </div>
                   {noteMode==="edit"?(
-                    <div ref={editorRef} contentEditable suppressContentEditableWarning className="note-editor" style={{padding:"20px",minHeight:400,color:t.text}} dangerouslySetInnerHTML={{__html:noteForm.body}} onInput={()=>{}}/>
+                    <div ref={editorRef} contentEditable suppressContentEditableWarning className="note-editor" style={{padding:"20px",minHeight:400,color:t.text}} dangerouslySetInnerHTML={{__html:noteForm.body}} onInput={()=>{
+                      const body=editorRef.current?.innerHTML||"";
+                      localStorage.setItem("cpalearnph_note_draft",JSON.stringify({...noteForm,body,noteId:activeNote?.id||null}));
+                    }}/>
                   ):(
                     <div className="note-editor" style={{padding:"20px",minHeight:200,color:t.text}} dangerouslySetInnerHTML={{__html:activeNote?.body||"<p style='color:#999;font-style:italic;'>Empty note.</p>"}}/>
                   )}
